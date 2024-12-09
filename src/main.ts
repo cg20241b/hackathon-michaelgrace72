@@ -1,36 +1,27 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 
 //scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x7f7f7f); // White background
+scene.background = new THREE.Color(0x0f0f0f); // White background
 
 //camera
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-
-camera.position.set(0, 0, 5);
-
-//controls
-const controls = new OrbitControls(camera);
-controls.target = new THREE.Vector3(0, 0, 0);
-controls.update();
-
 //renderer
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
-document.body.appendChild(renderer.domElement);
 
-// Shader material for the animation effect
+// Shader material for the letter
 const letterMaterial = new THREE.ShaderMaterial({
   uniforms: {
-      lightPosition: { value: new THREE.Vector3() }, // Position of the glowing cube
-      ambientIntensity: { value: 0.656 }, // Example intensity (adjust based on ID)
-      diffuseColor: { value: new THREE.Color(0.1, 0.1, 0.8) }, // Base color
-      specularColor: { value: new THREE.Color(1.0, 1.0, 1.0) }, // White specular
-      shininess: { value: 20.0 } // Moderate shininess for plastic
+      lightPosition: { value: new THREE.Vector3() },
+      lightIntensity: { value: 1.0 },
+      ambientIntensity: { value: 0.237 },
+      diffuseColor: { value: new THREE.Color(0x191d88) }, // Updated color for the letter
+      specularColor: { value: new THREE.Color(1.0, 1.0, 1.0) },
+      shininess: { value: 20.0 }
   },
   vertexShader: `
       varying vec3 vNormal;
@@ -43,6 +34,7 @@ const letterMaterial = new THREE.ShaderMaterial({
   `,
   fragmentShader: `
       uniform vec3 lightPosition;
+      uniform float lightIntensity;
       uniform float ambientIntensity;
       uniform vec3 diffuseColor;
       uniform vec3 specularColor;
@@ -52,34 +44,33 @@ const letterMaterial = new THREE.ShaderMaterial({
       varying vec3 vPosition;
 
       void main() {
+          float distance = length(lightPosition - vPosition);
+          float attenuation = lightIntensity / (1.0 + 0.1 * distance * distance);
+
           vec3 lightDir = normalize(lightPosition - vPosition);
           vec3 viewDir = normalize(-vPosition);
           vec3 reflectDir = reflect(-lightDir, vNormal);
 
-          // Ambient
           vec3 ambient = ambientIntensity * diffuseColor;
-
-          // Diffuse
           float diff = max(dot(vNormal, lightDir), 0.0);
-          vec3 diffuse = diff * diffuseColor;
-
-          // Specular (Plastic)
+          vec3 diffuse = diff * diffuseColor * attenuation;
           float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-          vec3 specular = spec * specularColor;
+          vec3 specular = spec * specularColor * attenuation;
 
           gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
       }
   `
 });
 
-
+// Shader material for the number
 const numberMaterial = new THREE.ShaderMaterial({
   uniforms: {
-      lightPosition: { value: new THREE.Vector3() }, // Position of the glowing cube
-      ambientIntensity: { value: 0.656 }, // Example intensity (adjust based on ID)
-      diffuseColor: { value: new THREE.Color(0.9, 0.8, 0.2) }, // Base color
-      specularColor: { value: new THREE.Color(0.9, 0.8, 0.2) }, // Metallic specular
-      shininess: { value: 50.0 } // High shininess for metallic effect
+      lightPosition: { value: new THREE.Vector3() },
+      lightIntensity: { value: 1.0 },
+      ambientIntensity: { value: 0.237 },
+      diffuseColor: { value: new THREE.Color(0xe6e277) }, // Updated color for the number
+      specularColor: { value: new THREE.Color(1.0, 1.0, 1.0) },
+      shininess: { value: 20.0 }
   },
   vertexShader: `
       varying vec3 vNormal;
@@ -105,14 +96,9 @@ const numberMaterial = new THREE.ShaderMaterial({
           vec3 viewDir = normalize(-vPosition);
           vec3 halfDir = normalize(lightDir + viewDir);
 
-          // Ambient
           vec3 ambient = ambientIntensity * diffuseColor;
-
-          // Diffuse
           float diff = max(dot(vNormal, lightDir), 0.0);
           vec3 diffuse = diff * diffuseColor;
-
-          // Specular (Metal)
           float spec = pow(max(dot(vNormal, halfDir), 0.0), shininess);
           vec3 specular = spec * specularColor;
 
@@ -120,7 +106,6 @@ const numberMaterial = new THREE.ShaderMaterial({
       }
   `
 });
-
 
 // Add glowing cube at the center of the scene
 const glowMaterial = new THREE.ShaderMaterial({
@@ -153,11 +138,7 @@ scene.add(glowCube);
 const pointLight = new THREE.PointLight(0xffffff, 1, 10);
 pointLight.position.set(0, 0, 0);
 pointLight.castShadow = true;
-pointLight.shadow.mapSize.width = 1024;
-pointLight.shadow.mapSize.height = 1024;
 scene.add(pointLight);
-
-
 
 // Load font for 3D text
 const loader = new FontLoader();
@@ -168,14 +149,10 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', 
         size: 1,
         height: 0.2,
     });
-    const letterMesh = new THREE.Mesh(letterGeometry,[
-      new THREE.MeshBasicMaterial({color: 0x191D88}), // front
-      new THREE.MeshBasicMaterial({color: 0x191D08}), // side
-    ], letterMaterial);
-    letterMesh.position.x = -2;
+    const letterMesh = new THREE.Mesh(letterGeometry, letterMaterial);
+    letterMesh.position.x = -3;
     letterMesh.position.y = 0;
     letterMesh.position.z = 0;
-    letterMesh.castShadow = true;
     scene.add(letterMesh);
 
     // Create geometry for the number '0' on the right side
@@ -184,14 +161,11 @@ loader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', 
         size: 1,
         height: 0.2,
     });
-    const numberMesh = new THREE.Mesh(numberGeometry,[
-      new THREE.MeshBasicMaterial({color: 0xe6e277}), // front
-      new THREE.MeshBasicMaterial({color: 0xe6e200}), // side
-    ], numberMaterial);
+
+    const numberMesh = new THREE.Mesh(numberGeometry, numberMaterial);
     numberMesh.position.x = 2;
     numberMesh.position.y = 0;
     numberMesh.position.z = 0;  
-    letterMesh.castShadow = true;
     scene.add(numberMesh);
 });
 
@@ -200,14 +174,17 @@ camera.position.z = 5;
 
 // Function to animate the scene
 function animate(): void {
-    glowCube.rotation.y += 0.02;
-    glowCube.rotation.x += 0.02;
-    letterMaterial.uniforms.lightPosition.value = glowCube.position;
-    numberMaterial.uniforms.lightPosition.value = glowCube.position;
-    renderer.render(scene, camera);
-    requestAnimationFrame(animate);
 
+  letterMaterial.uniforms.lightPosition.value = glowCube.position;
+
+  numberMaterial.uniforms.lightPosition.value = glowCube.position;
+
+  pointLight.intensity = 10; // Sync light intensity for point light
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
 }
+document.body.appendChild(renderer.domElement);
 animate();
 
 // Handle window resize
